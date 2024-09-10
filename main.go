@@ -14,18 +14,19 @@ import (
 )
 
 var (
-	debianVersion    string
-	debianArch       string
-	outputDir        string
-	diskSize         string
-	memorySize       string
-	sshUsername      string
-	sshPassword      string
-	isoBaseURL       string
-	checksumFileName string
-	isoFileName      string
-	preseedFile      string
-	genOption        string
+	debianVersion      string
+	debianArch         string
+	outputDir          string
+	diskSize           string
+	memorySize         string
+	sshUsername        string
+	sshPassword        string
+	isoBaseURL         string
+	checksumFileName   string
+	isoFileName        string
+	preseedFile        string
+	genOption          string
+	packerTemplateFile string
 )
 
 func main() {
@@ -48,6 +49,7 @@ func main() {
 	rootCmd.Flags().StringVar(&isoFileName, "iso-file", "", "ISO file name (e.g., debian-11.6.0-amd64-netinst.iso)")
 	rootCmd.Flags().StringVar(&preseedFile, "preseed-file", "preseed.cfg.tpl", "Path to the preseed template file")
 	rootCmd.Flags().StringVar(&genOption, "gen", "", "Generate option: 'preseed', 'packer', or 'all' (default: build image)")
+	rootCmd.Flags().StringVar(&packerTemplateFile, "packer-template", "debian.pkr.hcl.tpl", "Path to the Packer template file")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -78,7 +80,7 @@ func runGenerator(cmd *cobra.Command, args []string) {
 		}
 		fmt.Println("Preseed file generated successfully.")
 	case "packer":
-		if _, err := generatePackerTemplate(); err != nil {
+		if err := generatePackerTemplate(); err != nil {
 			fmt.Printf("Error generating Packer template: %v\n", err)
 			os.Exit(1)
 		}
@@ -88,7 +90,7 @@ func runGenerator(cmd *cobra.Command, args []string) {
 			fmt.Printf("Error generating preseed file: %v\n", err)
 			os.Exit(1)
 		}
-		if _, err := generatePackerTemplate(); err != nil {
+		if err := generatePackerTemplate(); err != nil {
 			fmt.Printf("Error generating Packer template: %v\n", err)
 			os.Exit(1)
 		}
@@ -99,15 +101,16 @@ func runGenerator(cmd *cobra.Command, args []string) {
 			fmt.Printf("Error generating preseed file: %v\n", err)
 			os.Exit(1)
 		}
-		packerTemplateFile, err := generatePackerTemplate()
-		if err != nil {
+		if err := generatePackerTemplate(); err != nil {
 			fmt.Printf("Error generating Packer template: %v\n", err)
 			os.Exit(1)
 		}
 
+		outputPackerFile := fmt.Sprintf("debian-%s-%s.pkr.hcl", debianVersion, debianArch)
+
 		// Install Packer plugins
 		fmt.Println("Installing Packer plugins...")
-		initCmd := exec.Command("packer", "init", packerTemplateFile)
+		initCmd := exec.Command("packer", "init", outputPackerFile)
 		initCmd.Stdout = os.Stdout
 		initCmd.Stderr = os.Stderr
 		if err := initCmd.Run(); err != nil {
@@ -117,7 +120,7 @@ func runGenerator(cmd *cobra.Command, args []string) {
 
 		fmt.Println("Running Packer to build the image...")
 		// Run Packer
-		packerCmd := exec.Command("packer", "build", packerTemplateFile)
+		packerCmd := exec.Command("packer", "build", outputPackerFile)
 		packerCmd.Stdout = os.Stdout
 		packerCmd.Stderr = os.Stderr
 		if err := packerCmd.Run(); err != nil {
@@ -193,54 +196,29 @@ func generatePreseedFile() error {
 	return nil
 }
 
-func generatePackerTemplate() (string, error) {
-	packerTemplateFile := fmt.Sprintf("debian-%s-%s.pkr.hcl", debianVersion, debianArch)
-
-	tmpl := template.Must(template.New("packer").Parse(`
-packer {
-  required_plugins {
-    qemu = {
-      version = ">= 1.0.0"
-      source  = "github.com/hashicorp/qemu"
-    }
-  }
-}
-
-source "qemu" "debian" {
-  iso_url      = "{{.ISOURL}}"
-  iso_checksum = "{{.ISOChecksum}}"
-  output_directory = "{{.OutputDir}}"
-  shutdown_command = "echo '{{.SSHPassword}}' | sudo -S /sbin/shutdown -hP now"
-  disk_size        = "{{.DiskSize}}"
-  memory           = "{{.MemorySize}}"
-  format           = "qcow2"
-  accelerator      = "kvm"
-  http_directory   = "http"
-  ssh_username     = "{{.SSHUsername}}"
-  ssh_password     = "{{.SSHPassword}}"
-  ssh_timeout      = "20m"
-  vm_name          = "debian-{{.DebianVersion}}-{{.DebianArch}}"
-  net_device       = "virtio-net"
-  disk_interface   = "virtio"
-  boot_wait        = "5s"
-  boot_command     = [
-    "<esc><wait>",
-    "auto ",
-    "url=http://{{ "{{ .HTTPIP }}" }}:{{ "{{ .HTTPPort }}" }}/preseed.cfg ",
-    "<enter>"
-  ]
-}
-
-build {
-  sources = ["source.qemu.debian"]
-}
-`))
-
-	f, err := os.Create(packerTemplateFile)
+func generatePackerTemplate() error {
+	source, err := os.Open(packerTemplateFile)
 	if err != nil {
-		return "", err
+		return err
 	}
-	defer f.Close()
+	defer source.Close()
+
+	content, err := io.ReadAll(source)
+	if err != nil {
+		return err
+	}
+
+	tmpl, err := template.New("packer").Parse(string(content))
+	if err != nil {
+		return err
+	}
+
+	outputFile := fmt.Sprintf("debian-%s-%s.pkr.hcl", debianVersion, debianArch)
+	destination, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
 
 	// If ISO file name is not provided, construct it
 	if isoFileName == "" {
@@ -250,7 +228,7 @@ build {
 	isoURL := fmt.Sprintf("%s%s", isoBaseURL, isoFileName)
 	isoChecksum := fmt.Sprintf("file:%s%s", isoBaseURL, checksumFileName)
 
-	err = tmpl.Execute(f, struct {
+	data := struct {
 		DebianVersion string
 		DebianArch    string
 		OutputDir     string
@@ -270,11 +248,12 @@ build {
 		SSHPassword:   sshPassword,
 		ISOURL:        isoURL,
 		ISOChecksum:   isoChecksum,
-	})
-
-	if err != nil {
-		return "", err
 	}
 
-	return packerTemplateFile, nil
+	err = tmpl.Execute(destination, data)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

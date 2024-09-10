@@ -7,6 +7,7 @@ debvirt-image-kit is a tool to create Debian images for KVM virtualization using
 * Generates a random SSH password if not provided
 * Copies the specified preseed file to the `http` directory
 * Generates a Packer template based on the provided parameters
+* Supports loading of external Packer template files
 * Installs Packer plugins
 * Executes Packer to build the Debian image
 * Supports generation of individual components (preseed, Packer template) or both without building the image
@@ -16,6 +17,7 @@ debvirt-image-kit is a tool to create Debian images for KVM virtualization using
 - Ensure that you have sufficient permissions to run QEMU/KVM on your system.
 - The generated image will be in qcow2 format, suitable for use with KVM.
 - Customize the preseed file according to your needs for automated Debian installation.
+- The default Packer template file is `debian.pkr.hcl.tpl`. You can customize this template or use your own.
 
 ## Installation
 
@@ -29,7 +31,9 @@ $ go build
 
 1. Prepare a `preseed.cfg.tpl` file with your desired Debian installation configurations.
 
-2. Run the tool:
+2. Optionally, prepare a `debian.pkr.hcl.tpl` file with your desired Packer template configurations.
+
+3. Run the tool:
 
    ```
    $ ./debvirt-image-kit --version 12.7.0
@@ -37,7 +41,7 @@ $ go build
 
    This will generate both the preseed file and Packer template, then build the image.
 
-3. To generate only specific components:
+4. To generate only specific components:
 
    - Generate only the preseed file:
      ```
@@ -54,7 +58,7 @@ $ go build
      $ ./debvirt-image-kit --gen all
      ```
 
-4. Additional options:
+5. Additional options:
 
    - Specify a custom SSH username:
      ```
@@ -69,6 +73,11 @@ $ go build
    - Specify custom disk size and memory:
      ```
      $ ./debvirt-image-kit --disk-size 30000M --memory 4096
+     ```
+
+   - Use a custom Packer template file:
+     ```
+     $ ./debvirt-image-kit --packer-template my-custom-template.pkr.hcl.tpl
      ```
 
 ## Example Output
