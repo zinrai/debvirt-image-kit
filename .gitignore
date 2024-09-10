@@ -1,0 +1,4 @@
+*.hcl
+output
+http
+debvirt-image-kit
