@@ -18,6 +18,7 @@ debvirt-image-kit is a tool to create Debian images for KVM virtualization using
 - The generated image will be in qcow2 format, suitable for use with KVM.
 - Customize the preseed file according to your needs for automated Debian installation.
 - The default Packer template file is `debian.pkr.hcl.tpl`. You can customize this template or use your own.
+- The default preseed template file is `preseed.cfg.tpl`. You can customize this template or use your own.
 
 ## Installation
 
@@ -78,6 +79,11 @@ $ go build
    - Use a custom Packer template file:
      ```
      $ ./debvirt-image-kit --packer-template my-custom-template.pkr.hcl.tpl
+     ```
+
+   - Use a custom preseed template file:
+     ```
+     $ ./debvirt-image-kit --preseed-file my-custom-preseed.cfg.tpl
      ```
 
 ## Example Output
