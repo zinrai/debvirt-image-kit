@@ -1,112 +1,38 @@
 # debvirt-image-kit
 
-debvirt-image-kit is a tool to create Debian images for KVM virtualization using HashiCorp Packer as a backend.
+debvirt-image-kit creates Debian images for KVM virtualization using HashiCorp Packer as a backend.
 
-## Features
+It renders two build inputs from local templates and drives Packer over them:
 
-* Generates a random SSH password if not provided
-* Copies the specified preseed file to the `http` directory
-* Generates a Packer template based on the provided parameters
-* Supports loading of external Packer template files
-* Installs Packer plugins
-* Executes Packer to build the Debian image
-* Supports generation of individual components (preseed, Packer template) or both without building the image
+- `preseed.cfg`, the answer file the installer fetches over HTTP for an unattended Debian install
+- a Packer template that boots the Debian netinst ISO under QEMU/KVM and produces a qcow2 image
 
-## Notes
+## Model
 
-- Ensure that you have sufficient permissions to run QEMU/KVM on your system.
-- The generated image will be in qcow2 format, suitable for use with KVM.
-- Customize the preseed file according to your needs for automated Debian installation.
-- The default Packer template file is `debian.pkr.hcl.tpl`. You can customize this template or use your own.
-- The default preseed template file is `preseed.cfg.tpl`. You can customize this template or use your own.
+The work is split into two commands so the rendered inputs can be inspected before a multi-minute build runs.
 
-## Installation
-
-Build the tool:
+1. `render` writes the build inputs into a `build-debian-<version>-<arch>` directory
+2. `build` runs `packer init` and `packer build` against the image with that `--version` and `--arch`
 
 ```
-$ go build
+debvirt-image-kit render --version 12.7.0
+debvirt-image-kit build --version 12.7.0
 ```
 
-## Usage
+Both commands identify the image by `--version` and `--arch`, so `build` needs nothing else. The per-version directory lets several images coexist in one working directory. Re-run `render` to change anything.
 
-1. Prepare a `preseed.cfg.tpl` file with your desired Debian installation configurations.
+Run `debvirt-image-kit render -h` for flags.
 
-2. Optionally, prepare a `debian.pkr.hcl.tpl` file with your desired Packer template configurations.
+## Templates
 
-3. Run the tool:
+`preseed.cfg.tpl` and `debian.pkr.hcl.tpl` are loaded from the working directory by default. Point `--preseed-file` and `--packer-template` at your own copies to customize the install or the Packer source.
 
-   ```
-   $ ./debvirt-image-kit --version 12.7.0
-   ```
+## Requirements
 
-   This will generate both the preseed file and Packer template, then build the image.
+- `packer` on `PATH` (needed by `build`, not by `render`)
+- Permission to run QEMU/KVM
 
-4. To generate only specific components:
-
-   - Generate only the preseed file:
-     ```
-     $ ./debvirt-image-kit --gen preseed
-     ```
-
-   - Generate only the Packer template:
-     ```
-     $ ./debvirt-image-kit --gen packer
-     ```
-
-   - Generate both preseed and Packer template without building the image:
-     ```
-     $ ./debvirt-image-kit --gen all
-     ```
-
-5. Additional options:
-
-   - Specify a custom SSH username:
-     ```
-     $ ./debvirt-image-kit --ssh-username myuser
-     ```
-
-   - Specify a custom SSH password (if not provided, a random password will be generated):
-     ```
-     $ ./debvirt-image-kit --ssh-password mypassword
-     ```
-
-   - Specify custom disk size and memory:
-     ```
-     $ ./debvirt-image-kit --disk-size 30000M --memory 4096
-     ```
-
-   - Use a custom Packer template file:
-     ```
-     $ ./debvirt-image-kit --packer-template my-custom-template.pkr.hcl.tpl
-     ```
-
-   - Use a custom preseed template file:
-     ```
-     $ ./debvirt-image-kit --preseed-file my-custom-preseed.cfg.tpl
-     ```
-
-## Example Output
-
-```
-$ ./debvirt-image-kit --version 12.7.0
-Starting debvirt-image-kit...
-Generated random SSH password: pBdJ4WPqcYK7zIOH
-Installing Packer plugins...
-Running Packer to build the image...
-qemu.debian: output will be in this color.
-
-==> qemu.debian: Retrieving ISO
-==> qemu.debian: Trying https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.7.0-amd64-netinst.iso
-...
-Build 'qemu.debian' finished after 5 minutes 31 seconds.
-
-==> Wait completed after 5 minutes 31 seconds
-
-==> Builds finished. The artifacts of successful builds are:
---> qemu.debian: VM files in directory: output
-debvirt-image-kit: Debian image generated successfully!
-```
+If `--ssh-password` is omitted, a random password is generated and printed. It is set on the created user, and Packer uses it to connect over SSH during the build.
 
 ## License
 
