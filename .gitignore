@@ -1,4 +1,2 @@
-*.hcl
-output
-http
-debvirt-image-kit
+/debvirt-image-kit
+build-*/

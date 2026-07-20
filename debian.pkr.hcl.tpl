@@ -10,7 +10,7 @@ packer {
 source "qemu" "debian" {
   iso_url      = "{{.ISOURL}}"
   iso_checksum = "{{.ISOChecksum}}"
-  output_directory = "{{.OutputDir}}"
+  output_directory = "image"
   shutdown_command = "echo '{{.SSHPassword}}' | sudo -S /sbin/shutdown -hP now"
   disk_size        = "{{.DiskSize}}"
   memory           = "{{.MemorySize}}"
