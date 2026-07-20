@@ -11,7 +11,7 @@ import (
 func cmdBuild(args []string) error {
 	fs := flag.NewFlagSet("build", flag.ExitOnError)
 	var (
-		debianVersion = fs.String("version", "12.7.0", "Debian version of the rendered image to build")
+		debianVersion = fs.String("version", "13.6.0", "Debian version of the rendered image to build")
 		debianArch    = fs.String("arch", "amd64", "Debian architecture of the rendered image to build")
 	)
 	if err := fs.Parse(args); err != nil {

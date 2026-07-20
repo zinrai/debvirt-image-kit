@@ -13,14 +13,14 @@ import (
 func cmdRender(args []string) error {
 	fs := flag.NewFlagSet("render", flag.ExitOnError)
 	var (
-		debianVersion  = fs.String("version", "12.7.0", "Debian version")
+		debianVersion  = fs.String("version", "13.6.0", "Debian version")
 		debianArch     = fs.String("arch", "amd64", "Debian architecture")
 		diskSize       = fs.String("disk-size", "20000M", "Disk size (e.g. 5000M, 10G)")
 		memorySize     = fs.String("memory", "1024", "Memory size in MB")
 		sshUsername    = fs.String("ssh-username", "debian", "SSH username")
 		sshPassword    = fs.String("ssh-password", "", "SSH password (random if empty)")
-		isoBaseURL     = fs.String("iso-base-url", "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/", "Base URL for ISO download")
-		checksumFile   = fs.String("checksum-file", "SHA256SUMS", "Checksum file name under the ISO base URL")
+		isoBaseURL     = fs.String("iso-base-url", "https://cdimage.debian.org/debian-cd/", "Base URL prefix, with <version>/<arch>/iso-cd/ appended")
+		checksumFile   = fs.String("checksum-file", "SHA256SUMS", "Checksum file name in the iso-cd directory")
 		isoFileName    = fs.String("iso-file", "", "ISO file name (derived if empty)")
 		preseedFile    = fs.String("preseed-file", "preseed.cfg.tpl", "Path to the preseed template")
 		packerTemplate = fs.String("packer-template", "debian.pkr.hcl.tpl", "Path to the Packer template")
@@ -54,6 +54,11 @@ func cmdRender(args []string) error {
 	if iso == "" {
 		iso = fmt.Sprintf("debian-%s-%s-netinst.iso", *debianVersion, *debianArch)
 	}
+	// The base URL is a version-agnostic prefix. Version and arch flow into the
+	// path so that they alone determine the ISO source, matching the build
+	// directory and vm_name. Swapping the prefix to the archive or a mirror is
+	// then enough to reach an older release or route around a broken path.
+	isoDir := fmt.Sprintf("%s%s/%s/iso-cd/", *isoBaseURL, *debianVersion, *debianArch)
 	packer := packerData{
 		DebianVersion: *debianVersion,
 		DebianArch:    *debianArch,
@@ -61,8 +66,8 @@ func cmdRender(args []string) error {
 		MemorySize:    *memorySize,
 		SSHUsername:   *sshUsername,
 		SSHPassword:   password,
-		ISOURL:        fmt.Sprintf("%s%s", *isoBaseURL, iso),
-		ISOChecksum:   fmt.Sprintf("file:%s%s", *isoBaseURL, *checksumFile),
+		ISOURL:        isoDir + iso,
+		ISOChecksum:   "file:" + isoDir + *checksumFile,
 	}
 	if err := renderTemplate(*packerTemplate, filepath.Join(dir, renderedPackerTemplate), packer); err != nil {
 		return fmt.Errorf("render Packer template: %w", err)
